@@ -1,0 +1,85 @@
+﻿<File version="3.2">
+  <Code><![CDATA[#Define a Param block to use custom parameters in the project
+#Param ($CustomParameter)
+
+function Main {
+<#
+    .SYNOPSIS
+        The Main function starts the project application.
+    
+    .PARAMETER Commandline
+        $Commandline contains the complete argument string passed to the script packager executable.
+    
+    .NOTES
+        Use this function to initialize your script and to call GUI forms.
+		
+    .NOTES
+        To get the console output in the Packager (Forms Engine) use: 
+		$ConsoleOutput (Type: System.Collections.ArrayList)
+#>
+	Param ([String]$Commandline)
+	
+	#--------------------------------------------------------------------------
+	#TODO: Add initialization script here (Load modules and check requirements)
+	
+	$cred = ""
+	function installedmod {
+		Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+		$installedmodule1 = Get-InstalledModule -Name 'ExchangeOnlineManagement' -ErrorAction SilentlyContinue
+		$installedmodule2 = Get-InstalledModule -Name 'MSOnline' -ErrorAction SilentlyContinue
+		Import-Module -Name ActiveDirectory
+		$o365_Admin = $ConfigKey.O365Admin
+		$acctName = $o365_Admin
+		if ($installedmodule2.name -contains 'MSOnline') {
+			Connect-MsolService
+		} else {
+			install-packageprovider -name NuGet -MinimumVersion 2.8.5.201 -force
+			Register-PSRepository -Default -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+			Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+			Install-Module MSOnline
+			Connect-MsolService
+		}
+		Start-Sleep 2
+		if ($installedmodule1.name -contains 'ExchangeOnlineManagement' -and $installedmodule1.Version -gt "2.0.4") {
+			Import-Module ExchangeOnlineManagement
+			Connect-ExchangeOnline -UserPrincipalName $acctName -ShowProgress $true
+		} elseif ($installedmodule1.name -contains 'ExchangeOnlineManagement' -and $installedmodule1.Version -le "2.0.4") {
+			Uninstall-Module -name ExchangeOnlineManagement
+			Install-Module -Name ExchangeOnlineManagement -force
+			Import-Module ExchangeOnlineManagement
+			Connect-ExchangeOnline -UserPrincipalName $acctName -ShowProgress $true
+		} else {
+			install-packageprovider -name NuGet -MinimumVersion 2.8.5.201 -force
+			Register-PSRepository -Default -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+			Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+			Install-Module -Name ExchangeOnlineManagement
+			Import-Module ExchangeOnlineManagement
+			Connect-ExchangeOnline -UserPrincipalName $acctName -ShowProgress $true
+		}
+	}
+	
+	if ($ConfigKey.checkboxOffice365 -eq "True" -or $ConfigKey.checkboxExchangeHybridO365 -eq "True") {
+		
+		installedmod
+	}
+	if ($ConfigKey.checkboxExchange -eq "True" -or $ConfigKey.checkboxExchangeHybridO365 -eq "True") {
+		
+		$Exchange_Server = $ConfigKey.EXCH_Server
+		$Exchange_FQDN = "http://" + $Exchange_Server + "/PowerShell/"
+		$Global:ExchangeServer = $Exchange_FQDN
+		$Global:PSSExch = (New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $Global:ExchangeServer)
+	}
+	$ADFS_Config = $ConfigKey.ADFS_Server
+	$Global:ADConnect = $ADFS_Config
+	
+	#--------------------------------------------------------------------------
+	
+	if ((Show-User_Creator_psf) -eq 'OK') {
+	}
+	
+	$script:ExitCode = 0 #Set the exit code for the Packager
+	
+}
+
+]]></Code>
+</File>
